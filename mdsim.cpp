@@ -7,14 +7,13 @@
 #include <map>
 #include <errno.h>
 #include <string.h>
+#include <typeinfo>
 
 // template class for parameters
 class ParameterReader {
 
     private:
-        std::string name;
-        int vis_space;
-        double t_start, t_end, delta_t, x_min, y_min, z_min, x_max, y_max, z_max, r_cut, epsilon, sigma;
+        std::map<std::string,std::string> data;
 
     public:
 
@@ -22,30 +21,38 @@ class ParameterReader {
         std::ifstream parameters (filename);
         std::string line;
         if (parameters.is_open()){
-            parameters >> line >> name;
-            parameters >> line >> vis_space;
-            parameters >> line >> t_start;
-            parameters >> line >> t_end;
-            parameters >> line >> delta_t;
-            parameters >> line >> x_min;
-            parameters >> line >> y_min;
-            parameters >> line >> z_min;
-            parameters >> line >> x_max;
-            parameters >> line >> y_max;
-            parameters >> line >> z_max;
-            parameters >> line >> r_cut;
-            parameters >> line >> epsilon;
-            parameters >> line >> sigma;
+            while(!parameters.eof()){
+                std::getline(parameters, line);
+                if((line.length() <= 1)) continue;
+                size_t pos = line.find_first_of(" ");
+                size_t last = line.find_last_of(" ");
+                data.insert(std::pair<std::string,std::string>(line.substr(0, pos), line.substr(last+1, line.length())));
+            }
         }
+        parameters.close();
         return true;
     }
 
     inline bool IsDefined(const std::string& key) const{
+        int c = data.count(key);
+        if(c == 0){
+            return false;
+        }
         return true;
     }
+
     template<typename Type>
     inline void GetParameter(const std::string& key, Type &value) const{
-        return ;
+        std::map<std::string,std::string>::iterator it = data.find(key);
+        if(typeid(value) == typeid(double)){
+            value = std::stod(it->second);
+        }
+        else if(typeid(value) == typeid(int)){
+            value = std::stoi(it->second);
+        }
+        else if(typeid(value) == typeid(std::string)){
+            value = (it->second);
+        }
     }
 
 };
@@ -181,7 +188,6 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
 }
 
 int main( int argc, char** argv ){
-  
     if( argc != 3 ){
         std::cout << "Usage: ./mdsim [parameter file] [data file]" << std::endl;
         exit( EXIT_SUCCESS );
@@ -201,5 +207,4 @@ int main( int argc, char** argv ){
     free(particles);
 
     exit( EXIT_SUCCESS );
-  
 }
