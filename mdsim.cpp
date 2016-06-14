@@ -41,17 +41,23 @@ class ParameterReader {
         return true;
     }
 
-    template<typename Type>
+	  
+	  
+     inline void GetParameter(const std::string& key, std::string &value) const{
+            std::map<std::string,std::string>::const_iterator it = data.find(key);
+	      value = (it->second);
+     }
+     
+         template<typename Type>
     inline void GetParameter(const std::string& key, Type &value) const{
-        std::map<std::string,std::string>::iterator it = data.find(key);
+        std::map<std::string,std::string>::const_iterator it = data.find(key);
         if(typeid(value) == typeid(double)){
             value = std::stod(it->second);
+	    return;
         }
         else if(typeid(value) == typeid(int)){
             value = std::stoi(it->second);
-        }
-        else if(typeid(value) == typeid(std::string)){
-            value = (it->second);
+	    return;
         }
     }
 
@@ -152,11 +158,11 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
     double t = 0, t_end = 0, delta_t = 0;
     int vis_space = 0;
     std::string name;
-    parameters.GetParameter<double>(std::string("t_start"), t);
-    parameters.GetParameter<double>(std::string("t_end"), t_end);
-    parameters.GetParameter<double>(std::string("delta_t"), delta_t);
-    parameters.GetParameter<int>(std::string("vis_space"), vis_space);
-    parameters.GetParameter<std::string>(std::string("name"), name);
+    parameters.GetParameter<double>( std::string("t_start"), t);
+    parameters.GetParameter<double>( std::string("t_end"), t_end);
+    parameters.GetParameter<double>( std::string("delta_t"), delta_t);
+    parameters.GetParameter<int>( std::string("vis_space"), vis_space);
+    parameters.GetParameter( std::string("name"), name);
     int counter = 0;
 
     // compute forces Fi
