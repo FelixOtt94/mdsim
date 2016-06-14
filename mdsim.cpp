@@ -142,11 +142,15 @@ void writeVTK(particle* particles, std::string &base, int time, int numParticles
 
 void simulation(particle* particles, int numParticles, ParameterReader &parameters){
 
-    double t = 0, t_end = 0, delta_t;
+    double t = 0, t_end = 0, delta_t = 0;
+    int vis_space = 0;
+    std::string name;
     parameters.GetParameter<double>(std::string("t_start"), t);
     parameters.GetParameter<double>(std::string("t_end"), t_end);
     parameters.GetParameter<double>(std::string("delta_t"), delta_t);
-
+    parameters.GetParameter<int>(std::string("vis_space"), vis_space);
+    parameters.GetParameter<std::string>(std::string("name"), name);
+    int counter = 0;
 
     // compute forces Fi
 
@@ -160,8 +164,19 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
             particles[i].force1_old = particles[i].force1;
             particles[i].force2_old = particles[i].force2;
         }
-    }
 
+        // compute new forces Fi
+
+        for(int i=0; i<numParticles; ++i){
+            particles[i].v0 += particles[i].v0 + ((particles[i].force0_old + particles[i].force0)/(2*particles[i].m)) * delta_t;
+            particles[i].v1 += particles[i].v1 + ((particles[i].force1_old + particles[i].force1)/(2*particles[i].m)) * delta_t;
+            particles[i].v2 += particles[i].v2 + ((particles[i].force2_old + particles[i].force2)/(2*particles[i].m)) * delta_t;
+        }
+        counter++;
+        if(counter%vis_space == 0){
+            writeVTK(particles, name, counter, numParticles);
+        }
+    }
 
 }
 
@@ -172,16 +187,18 @@ int main( int argc, char** argv ){
         exit( EXIT_SUCCESS );
     }
 
-    int counter = 0;
+    int numParticles = 0;
     particle* particles;
 
-    readInitialData(argv[1], &particles, &counter);
-
-    free(particles);
+    readInitialData(argv[1], &particles, &numParticles);
 
     ParameterReader parameters;
 
     parameters.readParameters(std::string(argv[2]));
+
+    simulation(particles, numParticles, parameters);
+
+    free(particles);
 
     exit( EXIT_SUCCESS );
   
