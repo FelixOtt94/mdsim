@@ -200,8 +200,90 @@ void writeVTK(particle* particles, std::string &base, int time, int numParticles
     }
 }
 
+void getNeighbors(int i, int* neighbors,  cell* cell_parameter){
+    int counter =0;
+    int zkod = i / (cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y);
+    int ykod = (i - zkod*(cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y)) / cell_parameter->numbers_cell_x;
+    int xkod = i - zkod*(cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y) - ykod*cell_parameter->numbers_cell_x;
+    int xkod_up, ykod_up, zkod_up;
+    std::cout << "x: " << xkod << " y: " << ykod << " z: " << zkod << std::endl;
+    for(int z=-1; z<2; z++){
+        zkod_up = zkod+z;
+        if(zkod+z < 0){
+            zkod_up = cell_parameter->numbers_cell_z-1;
+        }else if(zkod+z >= cell_parameter->numbers_cell_z ){
+            zkod_up = 0;
+        }
+        for(int y=-1; y<2; y++){
+            ykod_up = ykod+y;
+            if(ykod+y < 0){
+                ykod_up = cell_parameter->numbers_cell_y-1;
+            }else if(ykod+y >= cell_parameter->numbers_cell_y ){
+                ykod_up = 0;
+            }
+            for(int x=-1; x<2; x++){
+                xkod_up = xkod+x;
+                if(xkod+x < 0){
+                    xkod_up = cell_parameter->numbers_cell_x-1;
+                }else if(xkod+x >= cell_parameter->numbers_cell_x ){
+                    xkod_up = 0;
+                }
+                std::cout << "x: " << xkod_up << " y: " << ykod_up << " z: " << zkod_up << std::endl;
+                //neighbors[counter++] = i + cell_parameter->numbers_cell_x *y + (cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y)*z+ x;
+                neighbors[counter++] = xkod_up + ykod_up*cell_parameter->numbers_cell_x+ zkod_up*(cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y);
+            }
+        }
+    }
+}
 
-void simulation(particle* particles, int numParticles, ParameterReader &parameters){
+void updateForce(ParameterReader &parameters, particle *particles, std::vector<std::list<int>> &cell_array, cell* cell_parameter){
+
+    int neighbors [27];
+    int c=0;
+    double r_ij;
+    double r [3];
+    double r_cut, epsilon, sigma;
+    parameters.GetParameter<double>(std::string("r_cut"), r_cut);
+    parameters.GetParameter<double>(std::string("epsilon"), epsilon);
+    parameters.GetParameter<double>(std::string("sigma"), sigma);
+
+    const double epsilon_24 = 24.0*epsilon;
+    const double sigma_6 = sigma*sigma*sigma*sigma*sigma*sigma;
+
+    for(std::vector<std::list<int>>::iterator it_ic = cell_array.begin(); it_ic != cell_array.end(); ++it_ic){
+        for(std::list<int>::iterator it_i = (*it_ic).begin(); it_i != (*it_ic).end(); ++it_i){
+            particles[*it_i].force0 = 0.0;
+            particles[*it_i].force1 = 0.0;
+            particles[*it_i].force2 = 0.0;
+
+            getNeighbors( c, neighbors , cell_parameter);
+            c++;
+            for(int i = 0; i<27; ++i){
+                for(std::list<int>::iterator it_j = cell_array[neighbors[i]].begin(); it_j != cell_array[neighbors[i]].end(); ++it_j){
+                        if(*it_i != *it_j){
+                            r[0]=particles[*it_j].x0 - particles[*it_i].x0;
+                            r[1]=particles[*it_j].x1 - particles[*it_i].x1;
+                            r[2]=particles[*it_j].x2 - particles[*it_i].x2;
+                            r_ij = sqrt(r[0]*r[0]+r[1]*r[1]+r[2]*r[2]);
+                            if(r_ij <= r_cut){
+                                double tmp = (epsilon_24 * (1.0/(r_ij*r_ij)) * (sigma_6/pow(r_ij,6)) * (1-2*(sigma_6/pow(r_ij,6))));
+                                particles[*it_i].force0 += tmp * r[0];
+                                particles[*it_i].force1 += tmp * r[1];
+                                particles[*it_i].force2 += tmp * r[2];
+                            }
+                        }
+
+                }
+            }
+
+        }
+
+
+    }
+
+}
+
+void simulation(particle* particles, int numParticles, ParameterReader &parameters, std::vector<std::list<int>> &cell_array, cell* cell_parameter){
 
     double t = 0, t_end = 0, delta_t = 0;
     int vis_space = 0;
@@ -213,7 +295,7 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
     parameters.GetParameter( std::string("name"), name);
     int counter = 0;
 
-    // compute forces Fi
+    updateForce(parameters, particles, cell_array, cell_parameter);
 
     while(t < t_end){
         t += delta_t;
@@ -226,7 +308,7 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
             particles[i].force2_old = particles[i].force2;
         }
 
-        // compute new forces Fi
+        updateForce(parameters, particles, cell_array, cell_parameter);
 
         for(int i=0; i<numParticles; ++i){
             particles[i].v0 += particles[i].v0 + ((particles[i].force0_old + particles[i].force0)/(2*particles[i].m)) * delta_t;
@@ -241,51 +323,25 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
 
 }
 
-void updateForce(ParameterReader &parameters, particle *particles, cell *cell_parameter, std::vector<std::list<int>> &cell_array){
 
-    int neighbors [27];
-    double r_ij;
-    double r [3];
-    double r_cut, epsilon, sigma;
-    parameters.GetParameter<double>(std::string("r_cut"), r_cut);
-    parameters.GetParameter<double>(std::string("epsilon"), epsilon);
-    parameters.GetParameter<double>(std::string("sigma"), sgima);
-
-    const double epsilon_24 = 24.0*epsilon;
-    const double sigma_6 = sigma*sigma*sigma*sigma*sigma*sigma;
-
-    for(std::vector<std::list>::iterator it_ic = cell_array.begin(); it_ic != cell_array.end(); ++it_ic){
-        for(std::list::iterator it_i = cell_array[*it_ic].begin(); it_i != cell_array[*it_ic].end(); ++it_i){
-            particles[*it_i].force0 = 0.0;
-            particles[*it_i].force1 = 0.0;
-            particles[*it_i].force2 = 0.0;
-
-            //neighbors()
-            for(int i = 0; i<27; ++i){
-                for(std::list::iterator it_j = cell_array[neighbors[i]].begin(); it_j != cell_array[neighbors[i]].end(); ++it_j){
-                        if(*it_i != *it_j){
-                            r[0]=particles[*it_j].x0 - particles[*it_i].x0;
-                            r[1]=particles[*it_j].x1 - particles[*it_i].x1;
-                            r[2]=particles[*it_j].x2 - particles[*it_i].x2;
-                            r_ij = sqrt(r[0]*r[0]+r[1]*r[1]+r[2]*r[2]);
-                            if(r_ij <= r_cut){
-                                particles[*it_i].force0 += epsilon_24 * (1.0/(r_ij*r_ij))XXXXXXXXXXXXXX;
-                                particles[*it_i].force1 += ;
-                                particles[*it_i].force2 += ;
-                            }
-                        }
-
-                }
-            }
-
-        }
-
-
-    }
-
-}
 
 int main( int argc, char** argv ){
+    int n[27];
+    cell p;
+    p.numbers_cell_x = 3;
+    p.numbers_cell_y = 3;
+    p.numbers_cell_z = 3;
+    getNeighbors(0, n,  &p);
+    for(int i=0; i<3; i++){
+        for(int j=0; j<3; j++){
+            for(int k=0; k<3; k++){
+                std::cout << n[i*9+j*3+k] << " ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
     if( argc != 3 ){
         std::cout << "Usage: ./mdsim [parameter file] [data file]" << std::endl;
         exit( EXIT_SUCCESS );
@@ -305,7 +361,7 @@ int main( int argc, char** argv ){
 
 
 
-    simulation(particles, numParticles, parameters);
+    simulation(particles, numParticles, parameters, cell_array, &cell_parameter);
 
     free(particles);
 
