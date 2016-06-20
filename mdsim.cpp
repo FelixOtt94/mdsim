@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <string.h>
 #include <typeinfo>
+#include <list>
+#include <vector>
 
 // template class for parameters
 class ParameterReader {
@@ -79,8 +81,44 @@ typedef struct {
    double force2_old;
 } particle;
 
-void readInitialData(const char* filename, particle** particles, int* counter){
+typedef struct{
+    double size_cell_x;
+    double size_cell_y;
+    double size_cell_z;
+    int numbers_cell_x;
+    int numbers_cell_y;
+    int numbers_cell_z;
+}cell;
+
+void readInitialData(const char* filename, particle** particles, int* counter, std::vector<std::list<int>> & cell_array, ParameterReader& parameters, cell* cell_parameter){
     double m, x0, x1, x2, v0, v1, v2;
+    double size_x, size_y, size_z;
+    double x_min, y_min, z_min;
+    double r_cut;
+    int x_index, y_index, z_index;
+
+    parameters.GetParameter<double>(std::string("x_max"), size_x);
+    parameters.GetParameter<double>(std::string("x_min"), x_min);
+    size_x -= x_min;
+    parameters.GetParameter<double>(std::string("y_max"), size_y);
+    parameters.GetParameter<double>(std::string("y_min"), y_min);
+    size_y -= y_min;
+    parameters.GetParameter<double>(std::string("z_max"), size_z);
+    parameters.GetParameter<double>(std::string("z_min"), z_min);
+    size_z -= z_min;
+
+    parameters.GetParameter<double>(std::string("r_cut"), r_cut);
+
+    cell_parameter-> numbers_cell_x = ((int) (size_x / r_cut));
+    cell_parameter-> size_cell_x = size_x/((double) cell_parameter-> numbers_cell_x);
+    cell_parameter-> numbers_cell_y = ((int) (size_y / r_cut));
+    cell_parameter-> size_cell_y = size_y/((double) cell_parameter-> numbers_cell_y);
+    cell_parameter-> numbers_cell_z = ((int) (size_z / r_cut));
+    cell_parameter-> size_cell_z = size_z/((double) cell_parameter-> numbers_cell_z);
+
+    cell_array.resize((cell_parameter->numbers_cell_x) * (cell_parameter->numbers_cell_y) * (cell_parameter->numbers_cell_z));
+
+
     std::ifstream infile (filename);
     std::string line;
     if (infile.is_open())
@@ -116,9 +154,18 @@ void readInitialData(const char* filename, particle** particles, int* counter){
             (*particles)[i].v1 = v1;
             (*particles)[i].v2 = v2;
             //std::cout << m << " " << x0 << " " << x1 << " " << x2 << " " << v0 << " " << v1 << " " << v2 << std::endl;
+
+            x_index = (int)((x0-x_min)/cell_parameter -> size_cell_x);
+            y_index = (int)((x1-y_min)/cell_parameter -> size_cell_y);
+            z_index = (int)((x2-z_min)/cell_parameter -> size_cell_z);
+
+            cell_array[z_index*(cell_parameter->numbers_cell_z) + y_index*(cell_parameter->numbers_cell_y) + x_index].push_front(i);
         }
     }
     input.close();
+
+
+
 }
 
 void writeVTK(particle* particles, std::string &base, int time, int numParticles){
@@ -152,6 +199,7 @@ void writeVTK(particle* particles, std::string &base, int time, int numParticles
         }
     }
 }
+
 
 void simulation(particle* particles, int numParticles, ParameterReader &parameters){
 
@@ -193,6 +241,50 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
 
 }
 
+void updateForce(ParameterReader &parameters, particle *particles, cell *cell_parameter, std::vector<std::list<int>> &cell_array){
+
+    int neighbors [27];
+    double r_ij;
+    double r [3];
+    double r_cut, epsilon, sigma;
+    parameters.GetParameter<double>(std::string("r_cut"), r_cut);
+    parameters.GetParameter<double>(std::string("epsilon"), epsilon);
+    parameters.GetParameter<double>(std::string("sigma"), sgima);
+
+    const double epsilon_24 = 24.0*epsilon;
+    const double sigma_6 = sigma*sigma*sigma*sigma*sigma*sigma;
+
+    for(std::vector<std::list>::iterator it_ic = cell_array.begin(); it_ic != cell_array.end(); ++it_ic){
+        for(std::list::iterator it_i = cell_array[*it_ic].begin(); it_i != cell_array[*it_ic].end(); ++it_i){
+            particles[*it_i].force0 = 0.0;
+            particles[*it_i].force1 = 0.0;
+            particles[*it_i].force2 = 0.0;
+
+            //neighbors()
+            for(int i = 0; i<27; ++i){
+                for(std::list::iterator it_j = cell_array[neighbors[i]].begin(); it_j != cell_array[neighbors[i]].end(); ++it_j){
+                        if(*it_i != *it_j){
+                            r[0]=particles[*it_j].x0 - particles[*it_i].x0;
+                            r[1]=particles[*it_j].x1 - particles[*it_i].x1;
+                            r[2]=particles[*it_j].x2 - particles[*it_i].x2;
+                            r_ij = sqrt(r[0]*r[0]+r[1]*r[1]+r[2]*r[2]);
+                            if(r_ij <= r_cut){
+                                particles[*it_i].force0 += epsilon_24 * (1.0/(r_ij*r_ij))XXXXXXXXXXXXXX;
+                                particles[*it_i].force1 += ;
+                                particles[*it_i].force2 += ;
+                            }
+                        }
+
+                }
+            }
+
+        }
+
+
+    }
+
+}
+
 int main( int argc, char** argv ){
     if( argc != 3 ){
         std::cout << "Usage: ./mdsim [parameter file] [data file]" << std::endl;
@@ -201,12 +293,17 @@ int main( int argc, char** argv ){
 
     int numParticles = 0;
     particle* particles;
+    cell cell_parameter;
+    std::vector<std::list<int>> cell_array;
 
-    readInitialData(argv[1], &particles, &numParticles);
 
     ParameterReader parameters;
 
     parameters.readParameters(std::string(argv[2]));
+
+    readInitialData(argv[1], &particles, &numParticles, cell_array, parameters, &cell_parameter);
+
+
 
     simulation(particles, numParticles, parameters);
 
