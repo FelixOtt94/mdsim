@@ -99,7 +99,6 @@ void readInitialData(const char* filename, particle** particles, int* counter, s
     double x_min, y_min, z_min;
     double r_cut;
     int x_index, y_index, z_index;
-
     parameters.GetParameter<double>(std::string("x_max"), size_x);
     parameters.GetParameter<double>(std::string("x_min"), x_min);
     size_x -= x_min;
@@ -180,7 +179,7 @@ void readInitialData(const char* filename, particle** particles, int* counter, s
             (*particles)[i].v0 = v0;
             (*particles)[i].v1 = v1;
             (*particles)[i].v2 = v2;
-            std::cout << m << " " << x0 << " " << x1 << " " << x2 << " " << v0 << " " << v1 << " " << v2 << std::endl;
+            //std::cout << m << " " << x0 << " " << x1 << " " << x2 << " " << v0 << " " << v1 << " " << v2 << std::endl;
 
             x_index = (int)((x0-x_min)/cell_parameter -> size_cell_x);
             y_index = (int)((x1-y_min)/cell_parameter -> size_cell_y);
@@ -340,16 +339,18 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
     parameters.GetParameter<double>(std::string("y_min"), y_min);
     parameters.GetParameter<double>(std::string("z_min"), z_min);
     int counter = 0;
-
+std::cout << "1" << std::endl;
     updateForce(parameters, particles, cell_array, cell_parameter);
 
     while(t < t_end){
-
+std::cout << "time " << t << std::endl;
         t += delta_t;
         for(int i=0; i<numParticles; ++i){
             x_index = (int)((particles[i].x0-x_min)/cell_parameter -> size_cell_x);
             y_index = (int)((particles[i].x1-y_min)/cell_parameter -> size_cell_y);
             z_index = (int)((particles[i].x2-z_min)/cell_parameter -> size_cell_z);
+            std::cout << "koords old x: " << particles[i].x0 << " y: " << particles[i].x1 << " z: " << particles[i].x2 << std::endl;
+                      std::cout << "index old x: " << x_index << " y: " << y_index << " z: " << z_index << std::endl;
             index_old = z_index*(cell_parameter->numbers_cell_y*cell_parameter->numbers_cell_x) + y_index*(cell_parameter->numbers_cell_x) + x_index;
 
             particles[i].x0 += particles[i].v0 * delta_t + 0.5 * (particles[i].force0 / particles[i].m) * delta_t * delta_t;
@@ -358,17 +359,50 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
             particles[i].force0_old = particles[i].force0;
             particles[i].force1_old = particles[i].force1;
             particles[i].force2_old = particles[i].force2;
-
             x_index = (int)((particles[i].x0-x_min)/cell_parameter -> size_cell_x);
-            y_index = (int)((particles[i].x1-y_min)/cell_parameter -> size_cell_y);
-            z_index = (int)((particles[i].x2-z_min)/cell_parameter -> size_cell_z);
+            if( x_index >= cell_parameter->numbers_cell_x ){
+                x_index = 0;
+            }else if( x_index < 0 ){
+                x_index = cell_parameter->numbers_cell_x-1;
+            }
+                y_index = (int)((particles[i].x1-y_min)/cell_parameter -> size_cell_y);
+            if( y_index >= cell_parameter->numbers_cell_y ){
+                y_index = 0;
+            }else if( y_index < 0 ){
+                y_index = cell_parameter->numbers_cell_y-1;
+            }
+                z_index = (int)((particles[i].x2-z_min)/cell_parameter -> size_cell_z);
+            if( z_index >= cell_parameter->numbers_cell_z ){
+                 z_index = 0;
+            }else if( z_index < 0 ){
+                z_index = cell_parameter->numbers_cell_z-1;
+            }
+            std::cout << "x: " << x_index << " y: " << y_index << " z: " << z_index << std::endl;
             index_new = z_index*(cell_parameter->numbers_cell_y*cell_parameter->numbers_cell_x) + y_index*(cell_parameter->numbers_cell_x) + x_index;
             if( index_old != index_new){
+                std::cout << "index_old: " << index_old << "index_new " << index_new << std::endl;
                 cell_array[index_old].remove(i);
-                cell_array[index_old].push_front(i);
+                cell_array[index_new].push_front(i);
+                if( particles[i].x0 >= (cell_parameter->size_x + x_min) ){
+                    particles[i].x0 -= cell_parameter->size_x;
+                }else if( particles[i].x0 <= x_min ){
+                    particles[i].x0 += cell_parameter->size_x;
+                    if(particles[i].x0 < 0)
+                        std::cout << particles[i].v0 << std::endl;
+                }
+                if( particles[i].x1 >= (cell_parameter->size_y + y_min) ){
+                    particles[i].x1 -= cell_parameter->size_y;
+                }else if( particles[i].x1 <= y_min ){
+                    particles[i].x1 += cell_parameter->size_y;
+                }
+                if( particles[i].x2 >= (cell_parameter->size_z + z_min) ){
+                    particles[i].x2 -= cell_parameter->size_z;
+                }else if( particles[i].x2 <= z_min ){
+                    particles[i].x2 += cell_parameter->size_z;
+                }
             }
         }
-
+std::cout << "upadte force" << std::endl;
         updateForce(parameters, particles, cell_array, cell_parameter);
 
         for(int i=0; i<numParticles; ++i){
@@ -378,6 +412,7 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
         }
         counter++;
         if(counter%vis_space == 0){
+            std::cout << "vtk" << std::endl;
             writeVTK(particles, name, counter, numParticles);
         }
     }
@@ -419,7 +454,6 @@ int main( int argc, char** argv ){
     parameters.readParameters(std::string(argv[2]));
 
     readInitialData(argv[1], &particles, &numParticles, cell_array, parameters, &cell_parameter);
-
 
 
     simulation(particles, numParticles, parameters, cell_array, &cell_parameter);
