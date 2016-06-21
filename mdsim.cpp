@@ -88,6 +88,9 @@ typedef struct{
     int numbers_cell_x;
     int numbers_cell_y;
     int numbers_cell_z;
+    double size_x;
+    double size_y;
+    double size_z;
 }cell;
 
 void readInitialData(const char* filename, particle** particles, int* counter, std::vector<std::list<int>> & cell_array, ParameterReader& parameters, cell* cell_parameter){
@@ -115,9 +118,11 @@ void readInitialData(const char* filename, particle** particles, int* counter, s
     cell_parameter-> size_cell_y = size_y/((double) cell_parameter-> numbers_cell_y);
     cell_parameter-> numbers_cell_z = ((int) (size_z / r_cut));
     cell_parameter-> size_cell_z = size_z/((double) cell_parameter-> numbers_cell_z);
+    cell_parameter->size_x = size_x;
+    cell_parameter->size_y = size_y;
+    cell_parameter->size_z = size_z;
 
     cell_array.resize((cell_parameter->numbers_cell_x) * (cell_parameter->numbers_cell_y) * (cell_parameter->numbers_cell_z));
-
 
     std::ifstream infile (filename);
     std::string line;
@@ -144,7 +149,29 @@ void readInitialData(const char* filename, particle** particles, int* counter, s
     if (input.is_open())
     {
         for(int i=0; i<*counter; ++i){
-            input >> m >> x0 >> x1 >> x2 >> v0 >> v1 >> v2;
+            //input >> m >> x0 >> x1 >> x2 >> v0 >> v1 >> v2;
+             std::getline(input, line);
+             int first = line.find_first_not_of(std::string(" "), 0);
+             int seconde = line.find(" ", first );
+             m = stod( line.substr(first, seconde) );
+             first = line.find_first_not_of(std::string(" "), seconde);
+             seconde = line.find(" ", first );
+             x0 = stod( line.substr(first, seconde) );
+             first = line.find_first_not_of(std::string(" "), seconde);
+             seconde = line.find(" ", first );
+             x1 = stod( line.substr(first, seconde) );
+             first = line.find_first_not_of(std::string(" "), seconde);
+             seconde = line.find(" ", first );
+             x2 = stod( line.substr(first, seconde) );
+             first = line.find_first_not_of(std::string(" "), seconde);
+             seconde = line.find(" ", first );
+             v0 = stod( line.substr(first, seconde) );
+             first = line.find_first_not_of(std::string(" "), seconde);
+             seconde = line.find(" ", first );
+             v1 = stod( line.substr(first, seconde) );
+             first = line.find_first_not_of(std::string(" "), seconde);
+             seconde = line.find(" ", first );
+             v2 = stod( line.substr(first, seconde) );
 
             (*particles)[i].m = m;
             (*particles)[i].x0 = x0;
@@ -153,13 +180,13 @@ void readInitialData(const char* filename, particle** particles, int* counter, s
             (*particles)[i].v0 = v0;
             (*particles)[i].v1 = v1;
             (*particles)[i].v2 = v2;
-            //std::cout << m << " " << x0 << " " << x1 << " " << x2 << " " << v0 << " " << v1 << " " << v2 << std::endl;
+            std::cout << m << " " << x0 << " " << x1 << " " << x2 << " " << v0 << " " << v1 << " " << v2 << std::endl;
 
             x_index = (int)((x0-x_min)/cell_parameter -> size_cell_x);
             y_index = (int)((x1-y_min)/cell_parameter -> size_cell_y);
             z_index = (int)((x2-z_min)/cell_parameter -> size_cell_z);
 
-            cell_array[z_index*(cell_parameter->numbers_cell_z) + y_index*(cell_parameter->numbers_cell_y) + x_index].push_front(i);
+            cell_array[z_index*(cell_parameter->numbers_cell_x*cell_parameter->numbers_cell_y) + y_index*(cell_parameter->numbers_cell_x) + x_index].push_front(i);
         }
     }
     input.close();
@@ -170,7 +197,7 @@ void readInitialData(const char* filename, particle** particles, int* counter, s
 
 void writeVTK(particle* particles, std::string &base, int time, int numParticles){
     std::string name(base);
-    name += time;
+    name += std::to_string(time);
     name += ".vtk";
     std::ofstream output (name);
     if(output.is_open())
@@ -206,7 +233,7 @@ void getNeighbors(int i, int* neighbors,  cell* cell_parameter){
     int ykod = (i - zkod*(cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y)) / cell_parameter->numbers_cell_x;
     int xkod = i - zkod*(cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y) - ykod*cell_parameter->numbers_cell_x;
     int xkod_up, ykod_up, zkod_up;
-    std::cout << "x: " << xkod << " y: " << ykod << " z: " << zkod << std::endl;
+    //std::cout << "x: " << xkod << " y: " << ykod << " z: " << zkod << std::endl;
     for(int z=-1; z<2; z++){
         zkod_up = zkod+z;
         if(zkod+z < 0){
@@ -228,7 +255,7 @@ void getNeighbors(int i, int* neighbors,  cell* cell_parameter){
                 }else if(xkod+x >= cell_parameter->numbers_cell_x ){
                     xkod_up = 0;
                 }
-                std::cout << "x: " << xkod_up << " y: " << ykod_up << " z: " << zkod_up << std::endl;
+                //std::cout << "x: " << xkod_up << " y: " << ykod_up << " z: " << zkod_up << std::endl;
                 //neighbors[counter++] = i + cell_parameter->numbers_cell_x *y + (cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y)*z+ x;
                 neighbors[counter++] = xkod_up + ykod_up*cell_parameter->numbers_cell_x+ zkod_up*(cell_parameter->numbers_cell_x * cell_parameter->numbers_cell_y);
             }
@@ -239,7 +266,7 @@ void getNeighbors(int i, int* neighbors,  cell* cell_parameter){
 void updateForce(ParameterReader &parameters, particle *particles, std::vector<std::list<int>> &cell_array, cell* cell_parameter){
 
     int neighbors [27];
-    int c=0;
+    int c=-1;
     double r_ij;
     double r [3];
     double r_cut, epsilon, sigma;
@@ -251,25 +278,38 @@ void updateForce(ParameterReader &parameters, particle *particles, std::vector<s
     const double sigma_6 = sigma*sigma*sigma*sigma*sigma*sigma;
 
     for(std::vector<std::list<int>>::iterator it_ic = cell_array.begin(); it_ic != cell_array.end(); ++it_ic){
+        c++;
         for(std::list<int>::iterator it_i = (*it_ic).begin(); it_i != (*it_ic).end(); ++it_i){
             particles[*it_i].force0 = 0.0;
             particles[*it_i].force1 = 0.0;
             particles[*it_i].force2 = 0.0;
 
             getNeighbors( c, neighbors , cell_parameter);
-            c++;
             for(int i = 0; i<27; ++i){
                 for(std::list<int>::iterator it_j = cell_array[neighbors[i]].begin(); it_j != cell_array[neighbors[i]].end(); ++it_j){
+
                         if(*it_i != *it_j){
+
                             r[0]=particles[*it_j].x0 - particles[*it_i].x0;
                             r[1]=particles[*it_j].x1 - particles[*it_i].x1;
                             r[2]=particles[*it_j].x2 - particles[*it_i].x2;
+                            if(r[0] > cell_parameter->size_cell_x){
+                                r[0] =  cell_parameter->size_x - fabs(particles[*it_j].x0 - particles[*it_i].x0);
+                            }
+                            if(r[1] > cell_parameter->size_cell_y){
+                                r[1] =  cell_parameter->size_y - fabs(particles[*it_j].x1 - particles[*it_i].x1);
+                            }
+                            if(r[2] > cell_parameter->size_cell_z){
+                                r[2] =  cell_parameter->size_z - fabs(particles[*it_j].x2 - particles[*it_i].x2);
+                            }
                             r_ij = sqrt(r[0]*r[0]+r[1]*r[1]+r[2]*r[2]);
                             if(r_ij <= r_cut){
+
                                 double tmp = (epsilon_24 * (1.0/(r_ij*r_ij)) * (sigma_6/pow(r_ij,6)) * (1-2*(sigma_6/pow(r_ij,6))));
                                 particles[*it_i].force0 += tmp * r[0];
                                 particles[*it_i].force1 += tmp * r[1];
                                 particles[*it_i].force2 += tmp * r[2];
+                                //std::cout << particles[*it_i].force0 << " " << particles[*it_i].force1 << " " << std::endl;
                             }
                         }
 
@@ -286,6 +326,9 @@ void updateForce(ParameterReader &parameters, particle *particles, std::vector<s
 void simulation(particle* particles, int numParticles, ParameterReader &parameters, std::vector<std::list<int>> &cell_array, cell* cell_parameter){
 
     double t = 0, t_end = 0, delta_t = 0;
+    int x_index, y_index, z_index;
+    double x_min, y_min, z_min;
+    int index_old, index_new;
     int vis_space = 0;
     std::string name;
     parameters.GetParameter<double>( std::string("t_start"), t);
@@ -293,27 +336,45 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
     parameters.GetParameter<double>( std::string("delta_t"), delta_t);
     parameters.GetParameter<int>( std::string("vis_space"), vis_space);
     parameters.GetParameter( std::string("name"), name);
+    parameters.GetParameter<double>(std::string("x_min"), x_min);
+    parameters.GetParameter<double>(std::string("y_min"), y_min);
+    parameters.GetParameter<double>(std::string("z_min"), z_min);
     int counter = 0;
 
     updateForce(parameters, particles, cell_array, cell_parameter);
 
     while(t < t_end){
+
         t += delta_t;
         for(int i=0; i<numParticles; ++i){
+            x_index = (int)((particles[i].x0-x_min)/cell_parameter -> size_cell_x);
+            y_index = (int)((particles[i].x1-y_min)/cell_parameter -> size_cell_y);
+            z_index = (int)((particles[i].x2-z_min)/cell_parameter -> size_cell_z);
+            index_old = z_index*(cell_parameter->numbers_cell_y*cell_parameter->numbers_cell_x) + y_index*(cell_parameter->numbers_cell_x) + x_index;
+
             particles[i].x0 += particles[i].v0 * delta_t + 0.5 * (particles[i].force0 / particles[i].m) * delta_t * delta_t;
             particles[i].x1 += particles[i].v1 * delta_t + 0.5 * (particles[i].force1 / particles[i].m) * delta_t * delta_t;
             particles[i].x2 += particles[i].v2 * delta_t + 0.5 * (particles[i].force2 / particles[i].m) * delta_t * delta_t;
             particles[i].force0_old = particles[i].force0;
             particles[i].force1_old = particles[i].force1;
             particles[i].force2_old = particles[i].force2;
+
+            x_index = (int)((particles[i].x0-x_min)/cell_parameter -> size_cell_x);
+            y_index = (int)((particles[i].x1-y_min)/cell_parameter -> size_cell_y);
+            z_index = (int)((particles[i].x2-z_min)/cell_parameter -> size_cell_z);
+            index_new = z_index*(cell_parameter->numbers_cell_y*cell_parameter->numbers_cell_x) + y_index*(cell_parameter->numbers_cell_x) + x_index;
+            if( index_old != index_new){
+                cell_array[index_old].remove(i);
+                cell_array[index_old].push_front(i);
+            }
         }
 
         updateForce(parameters, particles, cell_array, cell_parameter);
 
         for(int i=0; i<numParticles; ++i){
-            particles[i].v0 += particles[i].v0 + ((particles[i].force0_old + particles[i].force0)/(2*particles[i].m)) * delta_t;
-            particles[i].v1 += particles[i].v1 + ((particles[i].force1_old + particles[i].force1)/(2*particles[i].m)) * delta_t;
-            particles[i].v2 += particles[i].v2 + ((particles[i].force2_old + particles[i].force2)/(2*particles[i].m)) * delta_t;
+            particles[i].v0 +=  ((particles[i].force0_old + particles[i].force0)/(2*particles[i].m)) * delta_t;
+            particles[i].v1 +=  ((particles[i].force1_old + particles[i].force1)/(2*particles[i].m)) * delta_t;
+            particles[i].v2 +=  ((particles[i].force2_old + particles[i].force2)/(2*particles[i].m)) * delta_t;
         }
         counter++;
         if(counter%vis_space == 0){
