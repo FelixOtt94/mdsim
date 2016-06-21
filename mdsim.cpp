@@ -293,22 +293,30 @@ void updateForce(ParameterReader &parameters, particle *particles, std::vector<s
                             r[1]=particles[*it_j].x1 - particles[*it_i].x1;
                             r[2]=particles[*it_j].x2 - particles[*it_i].x2;
                             if(r[0] > cell_parameter->size_cell_x){
+                                r[0] =  -cell_parameter->size_x + fabs(particles[*it_j].x0 - particles[*it_i].x0);
+                            }else if( r[0] < (-cell_parameter->size_cell_x) ){
                                 r[0] =  cell_parameter->size_x - fabs(particles[*it_j].x0 - particles[*it_i].x0);
                             }
                             if(r[1] > cell_parameter->size_cell_y){
+                                r[1] =  -cell_parameter->size_y + fabs(particles[*it_j].x1 - particles[*it_i].x1);
+                            }else if( r[1] < (-cell_parameter->size_cell_y) ){
                                 r[1] =  cell_parameter->size_y - fabs(particles[*it_j].x1 - particles[*it_i].x1);
                             }
                             if(r[2] > cell_parameter->size_cell_z){
+                                r[2] =  -cell_parameter->size_z + fabs(particles[*it_j].x2 - particles[*it_i].x2);
+                            }else if( r[2] < (-cell_parameter->size_cell_z) ){
                                 r[2] =  cell_parameter->size_z - fabs(particles[*it_j].x2 - particles[*it_i].x2);
                             }
                             r_ij = sqrt(r[0]*r[0]+r[1]*r[1]+r[2]*r[2]);
                             if(r_ij <= r_cut){
 
-                                double tmp = (epsilon_24 * (1.0/(r_ij*r_ij)) * (sigma_6/pow(r_ij,6)) * (1-2*(sigma_6/pow(r_ij,6))));
+                                double tmp = (epsilon_24 * (1.0/(r_ij*r_ij)) * (sigma_6/pow(r_ij,6)) * (1.0-2.0*(sigma_6/pow(r_ij,6))));
                                 particles[*it_i].force0 += tmp * r[0];
                                 particles[*it_i].force1 += tmp * r[1];
                                 particles[*it_i].force2 += tmp * r[2];
                                 //std::cout << particles[*it_i].force0 << " " << particles[*it_i].force1 << " " << std::endl;
+                                if(*it_i == 8)
+                                    std::cout << "rij " << r_ij << " r0 " << r[0] << " r1 " << r[1] << " tmp " << tmp << " f0 "<< particles[8].force0 <<  " f1 "<< particles[8].force1 << std::endl;
                             }
                         }
 
@@ -339,20 +347,21 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
     parameters.GetParameter<double>(std::string("y_min"), y_min);
     parameters.GetParameter<double>(std::string("z_min"), z_min);
     int counter = 0;
-std::cout << "1" << std::endl;
+std::cout << "PARTICLE 8: x: " << particles[8].x0 << " y: " << particles[8].x1 << " v0 " << particles[8].v0 << " v1 " << particles[8].v1 << " f0 " << particles[8].force0 << " f1 " << particles[8].force1 << std::endl;
     updateForce(parameters, particles, cell_array, cell_parameter);
-
+std::cout << "PARTICLE 8: x: " << particles[8].x0 << " y: " << particles[8].x1 << " v0 " << particles[8].v0 << " v1 " << particles[8].v1 << " f0 " << particles[8].force0 << " f1 " << particles[8].force1 << std::endl;
     while(t < t_end){
-std::cout << "time " << t << std::endl;
+
         t += delta_t;
         for(int i=0; i<numParticles; ++i){
             x_index = (int)((particles[i].x0-x_min)/cell_parameter -> size_cell_x);
             y_index = (int)((particles[i].x1-y_min)/cell_parameter -> size_cell_y);
             z_index = (int)((particles[i].x2-z_min)/cell_parameter -> size_cell_z);
-            std::cout << "koords old x: " << particles[i].x0 << " y: " << particles[i].x1 << " z: " << particles[i].x2 << std::endl;
-                      std::cout << "index old x: " << x_index << " y: " << y_index << " z: " << z_index << std::endl;
+//std::cout << "koords old x: " << particles[i].x0 << " y: " << particles[i].x1 << " z: " << particles[i].x2 << std::endl;
+//std::cout << "index old x: " << x_index << " y: " << y_index << " z: " << z_index << std::endl;
             index_old = z_index*(cell_parameter->numbers_cell_y*cell_parameter->numbers_cell_x) + y_index*(cell_parameter->numbers_cell_x) + x_index;
-
+            if(i==8)
+std::cout << "PARTICLE 8: x: " << particles[i].x0 << " y: " << particles[i].x1 << " v0 " << particles[i].v0 << " v1 " << particles[i].v1 << " f0 " << particles[i].force0 << " f1 " << particles[i].force1 << std::endl;
             particles[i].x0 += particles[i].v0 * delta_t + 0.5 * (particles[i].force0 / particles[i].m) * delta_t * delta_t;
             particles[i].x1 += particles[i].v1 * delta_t + 0.5 * (particles[i].force1 / particles[i].m) * delta_t * delta_t;
             particles[i].x2 += particles[i].v2 * delta_t + 0.5 * (particles[i].force2 / particles[i].m) * delta_t * delta_t;
@@ -365,30 +374,30 @@ std::cout << "time " << t << std::endl;
             }else if( x_index < 0 ){
                 x_index = cell_parameter->numbers_cell_x-1;
             }
-                y_index = (int)((particles[i].x1-y_min)/cell_parameter -> size_cell_y);
+            y_index = (int)((particles[i].x1-y_min)/cell_parameter -> size_cell_y);
             if( y_index >= cell_parameter->numbers_cell_y ){
                 y_index = 0;
             }else if( y_index < 0 ){
                 y_index = cell_parameter->numbers_cell_y-1;
             }
-                z_index = (int)((particles[i].x2-z_min)/cell_parameter -> size_cell_z);
+            z_index = (int)((particles[i].x2-z_min)/cell_parameter -> size_cell_z);
             if( z_index >= cell_parameter->numbers_cell_z ){
                  z_index = 0;
             }else if( z_index < 0 ){
                 z_index = cell_parameter->numbers_cell_z-1;
             }
-            std::cout << "x: " << x_index << " y: " << y_index << " z: " << z_index << std::endl;
+//std::cout << "x: " << x_index << " y: " << y_index << " z: " << z_index << std::endl;
             index_new = z_index*(cell_parameter->numbers_cell_y*cell_parameter->numbers_cell_x) + y_index*(cell_parameter->numbers_cell_x) + x_index;
             if( index_old != index_new){
-                std::cout << "index_old: " << index_old << "index_new " << index_new << std::endl;
+//std::cout << "index_old: " << index_old << " index_new " << index_new << std::endl;
                 cell_array[index_old].remove(i);
                 cell_array[index_new].push_front(i);
                 if( particles[i].x0 >= (cell_parameter->size_x + x_min) ){
                     particles[i].x0 -= cell_parameter->size_x;
                 }else if( particles[i].x0 <= x_min ){
                     particles[i].x0 += cell_parameter->size_x;
-                    if(particles[i].x0 < 0)
-                        std::cout << particles[i].v0 << std::endl;
+//if(particles[i].x0 < 0)
+//std::cout << i << " "<< particles[i].v0 << std::endl;
                 }
                 if( particles[i].x1 >= (cell_parameter->size_y + y_min) ){
                     particles[i].x1 -= cell_parameter->size_y;
@@ -402,7 +411,7 @@ std::cout << "time " << t << std::endl;
                 }
             }
         }
-std::cout << "upadte force" << std::endl;
+//std::cout << "upadte force" << std::endl;
         updateForce(parameters, particles, cell_array, cell_parameter);
 
         for(int i=0; i<numParticles; ++i){
@@ -412,7 +421,7 @@ std::cout << "upadte force" << std::endl;
         }
         counter++;
         if(counter%vis_space == 0){
-            std::cout << "vtk" << std::endl;
+//std::cout << "vtk" << std::endl;
             writeVTK(particles, name, counter, numParticles);
         }
     }
