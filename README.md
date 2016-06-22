@@ -3,7 +3,9 @@ Molecular Dynamics: apply the linked cell algorithm to our simulation
 of two colliding blocks consisting of several thousan particles
 
 In order to run this programm use the following command:
-$ ./mdsim `[parameter file] [data file]
+```bash
+$ ./mdsim [parameter file] [data file]
+```
 
 If parameters are chosen wrong, velocities or forces can get too big -> Segmentation fault
 
