@@ -10,6 +10,7 @@
 #include <typeinfo>
 #include <list>
 #include <vector>
+#include <sstream>
 
 // template class for parameters
 class ParameterReader {
@@ -42,8 +43,8 @@ class ParameterReader {
         }
         return true;
     }
-
-	  
+/*
+      *
      // stores the value of the parameter key in the string value
      inline void GetParameter(const std::string& key, std::string &value) const{
             std::map<std::string,std::string>::const_iterator it = data.find(key);
@@ -63,6 +64,14 @@ class ParameterReader {
 	    return;
         }
     }
+    */
+             template<typename Type>
+      inline void GetParameter(const std::string& key, Type &value) const{
+          std::stringstream s;
+          std::map<std::string,std::string>::const_iterator it = data.find(key);
+          s << it->second;
+          s >> value;
+      }
 
 };
 
@@ -359,7 +368,7 @@ void simulation(particle* particles, int numParticles, ParameterReader &paramete
     parameters.GetParameter<double>( std::string("t_end"), t_end);
     parameters.GetParameter<double>( std::string("delta_t"), delta_t);
     parameters.GetParameter<int>( std::string("vis_space"), vis_space);
-    parameters.GetParameter( std::string("name"), name);
+    parameters.GetParameter<std::string>( std::string("name"), name);
     parameters.GetParameter<double>(std::string("x_min"), x_min);
     parameters.GetParameter<double>(std::string("y_min"), y_min);
     parameters.GetParameter<double>(std::string("z_min"), z_min);
